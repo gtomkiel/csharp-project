@@ -1,1 +1,16 @@
+# MacOS
 .DS_Store
+
+# IntelliJ
+.idea/
+
+# Build
+Debug/
+Release/
+
+# NuGet
+*.cache
+*.csproj.nuget.dgspec.json
+*.csproj.nuget.g.*
+project.packagespec.json
+*.project.**
