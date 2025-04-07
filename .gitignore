@@ -11,6 +11,9 @@
 Debug/
 Release/
 
+# User-specific files
+*.user
+
 # NuGet
 *.cache
 *.csproj.nuget.dgspec.json

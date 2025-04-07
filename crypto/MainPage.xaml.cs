@@ -2,22 +2,28 @@
 
 public partial class MainPage : ContentPage
 {
-    int count = 0;
-
     public MainPage()
     {
         InitializeComponent();
     }
 
-    private void OnCounterClicked(object sender, EventArgs e)
+    private async void OnRefreshClicked(object sender, EventArgs e)
     {
-        count++;
+        await DisplayAlert("Refresh", "Prices are being refreshed...", "OK");
+    }
 
-        if (count == 1)
-            CounterBtn.Text = $"Clicked {count} time";
-        else
-            CounterBtn.Text = $"Clicked {count} times";
-
-        SemanticScreenReader.Announce(CounterBtn.Text);
+    private async void OnViewHistoryClicked(object sender, EventArgs e)
+    {
+        // Get the cryptocurrency name from the button's parent StackLayout
+        if (sender is Button button && button.Parent is StackLayout stackLayout)
+        {
+            // The first Label in the StackLayout contains the cryptocurrency name
+            if (stackLayout.Children.FirstOrDefault(c => c is Label) is Label cryptoLabel)
+            {
+                string cryptoName = cryptoLabel.Text;
+                // Navigate to history page with the selected cryptocurrency
+                await Shell.Current.GoToAsync($"HistoryPage?Crypto={cryptoName}");
+            }
+        }
     }
 }
