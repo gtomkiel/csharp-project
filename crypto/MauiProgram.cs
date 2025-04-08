@@ -23,6 +23,7 @@ public static class MauiProgram
 
         // Register services
         builder.Services.AddSingleton<BybitApiService>();
+        builder.Services.AddSingleton<BybitWebSocketService>();
 
         // Register pages
         builder.Services.AddTransient<HistoryPage>();

@@ -35,6 +35,7 @@ public class BybitApiService
         string category = "linear")
     {
         var url = $"{baseUrl}?category={category}&symbol={symbol}&interval={interval}&start={startTime}&end={endTime}";
+        Console.WriteLine(url);
 
         try
         {
@@ -52,11 +53,14 @@ public class BybitApiService
     /// <summary>
     /// Helper method to fetch Bitcoin data for a specific time range
     /// </summary>
-    public async Task<KlineResponse> GetBitcoinDataAsync()
+    public async Task<KlineResponse> GetTokenDataAsync(string symbol,
+        int interval,
+        long startTime,
+        long endTime)
     {
         // These are the values from the URL in the prompt
         Console.WriteLine("REQUESTING BITCOIN PRICE");
-        return await GetKlineDataAsync("BTCUSDT", 1, 1670601600000, 1670608800000);
+        return await GetKlineDataAsync(symbol, interval, startTime, endTime);
     }
 }
 

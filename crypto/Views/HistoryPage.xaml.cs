@@ -64,7 +64,7 @@ public partial class HistoryPage : ContentPage
         {
             if (Crypto.Contains("Bitcoin"))
             {
-                var response = await _apiService.GetBitcoinDataAsync();
+                var response = await _apiService.GetTokenDataAsync("BTCUSDT", 15, 1670601600000, 1670608800000);
 
                 if (response != null && response.RetCode == 0 && response.Result?.List?.Count > 0)
                 {
