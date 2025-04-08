@@ -60,44 +60,44 @@ public partial class HistoryPage : ContentPage
 
         CryptoNameLabel.Text = Crypto;
 
+        string symbol = GetSymbolFromCryptoName(Crypto);
+        if (string.IsNullOrEmpty(symbol))
+        {
+            ShowErrorMessage($"Unknown cryptocurrency: {Crypto}");
+            return;
+        }
+
         try
         {
-            if (Crypto.Contains("Bitcoin"))
+            var response = await _apiService.GetTokenDataAsync(symbol, 15, 1670601600000, 1670608800000);
+
+            if (response != null && response.RetCode == 0 && response.Result?.List?.Count > 0)
             {
-                var response = await _apiService.GetTokenDataAsync("BTCUSDT", 15, 1670601600000, 1670608800000);
+                var candlesticks = response.Result.List.Select(item => new FinancialPoint(
+                    item.GetStartDateTime(),
+                    (double)item.HighPrice,
+                    (double)item.OpenPrice,
+                    (double)item.ClosePrice,
+                    (double)item.LowPrice
+                )).ToArray();
 
-                if (response != null && response.RetCode == 0 && response.Result?.List?.Count > 0)
+                Series = new ISeries[]
                 {
-                    var candlesticks = response.Result.List.Select(item => new FinancialPoint(
-                        item.GetStartDateTime(),
-                        (double)item.HighPrice,
-                        (double)item.OpenPrice,
-                        (double)item.ClosePrice,
-                        (double)item.LowPrice
-                    )).ToArray();
-
-                    Series = new ISeries[]
+                    new CandlesticksSeries<FinancialPoint>
                     {
-                        new CandlesticksSeries<FinancialPoint>
-                        {
-                            Values = candlesticks,
-                            UpStroke = new SolidColorPaint(SKColors.LightGreen) { StrokeThickness = 3 },
-                            DownStroke = new SolidColorPaint(SKColors.IndianRed) { StrokeThickness = 3 },
-                            UpFill = new SolidColorPaint(SKColors.LightGreen.WithAlpha(90)),
-                            DownFill = new SolidColorPaint(SKColors.IndianRed.WithAlpha(90))
-                        }
-                    };
+                        Values = candlesticks,
+                        UpStroke = new SolidColorPaint(SKColors.LightGreen) { StrokeThickness = 3 },
+                        DownStroke = new SolidColorPaint(SKColors.IndianRed) { StrokeThickness = 3 },
+                        UpFill = new SolidColorPaint(SKColors.LightGreen.WithAlpha(90)),
+                        DownFill = new SolidColorPaint(SKColors.IndianRed.WithAlpha(90))
+                    }
+                };
 
-                    OnPropertyChanged(nameof(Series));
-                }
-                else
-                {
-                    ShowErrorMessage("Failed to load Bitcoin data.");
-                }
+                OnPropertyChanged(nameof(Series));
             }
             else
             {
-                ShowErrorMessage($"History data for {Crypto} is not available yet.");
+                ShowErrorMessage($"Failed to load {Crypto} data.");
             }
         }
         catch (Exception ex)
@@ -132,5 +132,15 @@ public partial class HistoryPage : ContentPage
     private async void OnBackClicked(object sender, EventArgs e)
     {
         await Shell.Current.GoToAsync("..");
+    }
+
+    private string GetSymbolFromCryptoName(string cryptoName)
+    {
+        if (cryptoName.Contains("Bitcoin"))
+            return "BTCUSDT";
+        else if (cryptoName.Contains("Ethereum"))
+            return "ETHUSDT";
+        else
+            return string.Empty;
     }
 }
