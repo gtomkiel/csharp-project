@@ -10,6 +10,7 @@
 # Build
 Debug/
 Release/
+obj/
 
 # User-specific files
 *.user
