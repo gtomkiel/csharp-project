@@ -22,14 +22,14 @@ public class BybitApiService
     /// Fetches kline (candlestick) data from Bybit API
     /// </summary>
     /// <param name="symbol">Trading pair symbol (e.g., BTCUSD)</param>
-    /// <param name="interval">Time interval in minutes (e.g., 60 for 1 hour)</param>
+    /// <param name="interval">Time interval in minutes (e.g., 60 for 1 hour) or as a string (e.g., "D" for daily)</param>
     /// <param name="startTime">Start time in Unix timestamp milliseconds</param>
     /// <param name="endTime">End time in Unix timestamp milliseconds</param>
     /// <param name="category">Market category (default: linear)</param>
     /// <returns>KlineResponse object containing the API response data</returns>
     public async Task<KlineResponse> GetKlineDataAsync(
         string symbol,
-        int interval,
+        object interval,
         long startTime,
         long endTime,
         string category = "linear")
@@ -51,15 +51,14 @@ public class BybitApiService
     }
 
     /// <summary>
-    /// Helper method to fetch Bitcoin data for a specific time range
+    /// Helper method to fetch token data for a specific time range
     /// </summary>
     public async Task<KlineResponse> GetTokenDataAsync(string symbol,
-        int interval,
+        object interval,
         long startTime,
         long endTime)
     {
-        // These are the values from the URL in the prompt
-        Console.WriteLine("REQUESTING BITCOIN PRICE");
+        Console.WriteLine($"REQUESTING {symbol} PRICE - Interval: {interval}, Start: {new DateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(startTime).DateTime).ToString()}");
         return await GetKlineDataAsync(symbol, interval, startTime, endTime);
     }
 }

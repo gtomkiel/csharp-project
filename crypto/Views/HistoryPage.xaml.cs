@@ -11,21 +11,37 @@ namespace crypto.Views;
 [QueryProperty(nameof(Crypto), "Crypto")]
 public partial class HistoryPage : ContentPage
 {
+    // Enum to represent timeframe options
+    private enum TimeframeOption
+    {
+        LastDay,
+        LastWeek,
+        LastMonth,
+        LastYear
+    }
+
     private string _crypto = string.Empty;
     private readonly BybitApiService _apiService;
-    public ISeries[] Series { get; set; } = Array.Empty<ISeries>();
+    private TimeframeOption _selectedTimeframe = TimeframeOption.LastDay; // Default to last day
 
-    public Axis[] XAxes { get; set; } = new[]
+    // Properties for the Picker binding
+    public List<string> TimeframeOptions { get; } = new List<string> { "Last Day", "Last Week", "Last Month", "Last Year" };
+
+    public int SelectedTimeframeIndex
     {
-        new Axis
+        get => (int)_selectedTimeframe;
+        set
         {
-            LabelsPaint = new SolidColorPaint(SKColors.White),
-            LabelsRotation = 45,
-            Labeler = value => new DateTime((long)value).ToString("MM/dd HH:mm"),
-            UnitWidth = TimeSpan.FromMinutes(1).Ticks
+            if ((int)_selectedTimeframe != value)
+            {
+                _selectedTimeframe = (TimeframeOption)value;
+                OnPropertyChanged();
+            }
         }
-    };
+    }
 
+    public ISeries[] Series { get; set; } = Array.Empty<ISeries>();
+    public Axis[] XAxes { get; set; }
     public Axis[] YAxes { get; set; } = new[]
     {
         new Axis
@@ -51,6 +67,10 @@ public partial class HistoryPage : ContentPage
         InitializeComponent();
         _apiService = apiService;
         BindingContext = this;
+
+        // Initialize with default timeframe
+        _selectedTimeframe = TimeframeOption.LastDay;
+        UpdateXAxes(_selectedTimeframe);
     }
 
     private async void LoadCryptoData()
@@ -60,7 +80,7 @@ public partial class HistoryPage : ContentPage
 
         CryptoNameLabel.Text = Crypto;
 
-        string symbol = GetSymbolFromCryptoName(Crypto);
+        var symbol = GetSymbolFromCryptoName(Crypto);
         if (string.IsNullOrEmpty(symbol))
         {
             ShowErrorMessage($"Unknown cryptocurrency: {Crypto}");
@@ -69,27 +89,65 @@ public partial class HistoryPage : ContentPage
 
         try
         {
-            var response = await _apiService.GetTokenDataAsync(symbol, 15, 1670601600000, 1670608800000);
+            var now = DateTimeOffset.UtcNow;
+            var nowMillis = now.ToUnixTimeMilliseconds();
+            long startTimeMillis;
+            object interval;
+
+            // Set interval and start time based on selected timeframe
+            switch (_selectedTimeframe)
+            {
+                case TimeframeOption.LastDay:
+                    interval = 60; // 60 minutes
+                    startTimeMillis = now.AddDays(-1).ToUnixTimeMilliseconds();
+                    break;
+                case TimeframeOption.LastWeek:
+                    interval = 720; // 12 hours (720 minutes)
+                    startTimeMillis = now.AddDays(-7).ToUnixTimeMilliseconds();
+                    break;
+                case TimeframeOption.LastMonth:
+                    interval = "D"; // Daily
+                    startTimeMillis = now.AddMonths(-1).ToUnixTimeMilliseconds();
+                    break;
+                case TimeframeOption.LastYear:
+                    interval = "M"; // Monthly
+                    startTimeMillis = now.AddYears(-1).ToUnixTimeMilliseconds();
+                    break;
+                default:
+                    interval = 60;
+                    startTimeMillis = now.AddDays(-1).ToUnixTimeMilliseconds();
+                    break;
+            }
+
+            var response = await _apiService.GetTokenDataAsync(symbol, interval, startTimeMillis, nowMillis);
 
             if (response != null && response.RetCode == 0 && response.Result?.List?.Count > 0)
             {
-                var candlesticks = response.Result.List.Select(item => new FinancialPoint(
-                    item.GetStartDateTime(),
-                    (double)item.HighPrice,
-                    (double)item.OpenPrice,
-                    (double)item.ClosePrice,
-                    (double)item.LowPrice
-                )).ToArray();
+                var candlesticks = response.Result.List.Select(item =>
+                {
+                    // Convert UTC time to local time zone
+                    var utcDateTime = item.GetStartDateTime();
+                    var localDateTime = TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, TimeZoneInfo.Local);
+
+                    return new FinancialPoint(
+                        localDateTime,
+                        (double)item.HighPrice,
+                        (double)item.OpenPrice,
+                        (double)item.ClosePrice,
+                        (double)item.LowPrice
+                    );
+                }).ToArray();
 
                 Series = new ISeries[]
                 {
                     new CandlesticksSeries<FinancialPoint>
                     {
                         Values = candlesticks,
-                        UpStroke = new SolidColorPaint(SKColors.LightGreen) { StrokeThickness = 3 },
-                        DownStroke = new SolidColorPaint(SKColors.IndianRed) { StrokeThickness = 3 },
+                        UpStroke = new SolidColorPaint(SKColors.LightGreen) { StrokeThickness = 5 },
+                        DownStroke = new SolidColorPaint(SKColors.IndianRed) { StrokeThickness = 5 },
                         UpFill = new SolidColorPaint(SKColors.LightGreen.WithAlpha(90)),
-                        DownFill = new SolidColorPaint(SKColors.IndianRed.WithAlpha(90))
+                        DownFill = new SolidColorPaint(SKColors.IndianRed.WithAlpha(90)),
+                        MaxBarWidth = 20 // Increase the maximum width of the candlesticks
                     }
                 };
 
@@ -104,6 +162,60 @@ public partial class HistoryPage : ContentPage
         {
             ShowErrorMessage($"Error loading data: {ex.Message}");
         }
+    }
+
+    private void UpdateXAxes(TimeframeOption timeframeOption)
+    {
+        string dateFormat;
+        TimeSpan unitWidth;
+
+        // Set appropriate date format and unit width based on timeframe
+        switch (timeframeOption)
+        {
+            case TimeframeOption.LastDay:
+                dateFormat = "HH:mm";
+                unitWidth = TimeSpan.FromMinutes(60);
+                break;
+            case TimeframeOption.LastWeek:
+                dateFormat = "dd/MM HH:mm";
+                unitWidth = TimeSpan.FromMinutes(720);
+                break;
+            case TimeframeOption.LastMonth:
+                dateFormat = "dd/MM";
+                unitWidth = TimeSpan.FromDays(1);
+                break;
+            case TimeframeOption.LastYear:
+                dateFormat = "yyyy/MM";
+                unitWidth = TimeSpan.FromDays(30);
+                break;
+            default:
+                dateFormat = "dd/MM HH:mm";
+                unitWidth = TimeSpan.FromMinutes(60);
+                break;
+        }
+
+        XAxes = new[]
+        {
+            new Axis
+            {
+                LabelsPaint = new SolidColorPaint(SKColors.White),
+                LabelsRotation = 45,
+                Labeler = value => new DateTime((long)value).ToString(dateFormat),
+                UnitWidth = unitWidth.Ticks
+            }
+        };
+
+        OnPropertyChanged(nameof(XAxes));
+    }
+
+    private void OnTimeframeSelected(object sender, EventArgs e)
+    {
+        if (TimeframePicker.SelectedIndex < 0)
+            return;
+
+        _selectedTimeframe = (TimeframeOption)TimeframePicker.SelectedIndex;
+        UpdateXAxes(_selectedTimeframe);
+        LoadCryptoData();
     }
 
     private void ShowErrorMessage(string message)
