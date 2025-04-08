@@ -1,6 +1,8 @@
 ﻿using crypto.Services;
 using crypto.Views;
+using LiveChartsCore.SkiaSharpView.Maui;
 using Microsoft.Extensions.Logging;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace crypto;
 
@@ -10,6 +12,8 @@ public static class MauiProgram
     {
         var builder = MauiApp.CreateBuilder();
         builder
+            .UseSkiaSharp()
+            .UseLiveCharts()
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {

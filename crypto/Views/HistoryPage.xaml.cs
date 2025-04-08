@@ -1,13 +1,39 @@
-using System.Web;
 using crypto.Services;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using LiveChartsCore.Defaults;
+using SkiaSharp;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace crypto.Views;
 
 [QueryProperty(nameof(Crypto), "Crypto")]
 public partial class HistoryPage : ContentPage
 {
-    private string _crypto;
+    private string _crypto = string.Empty;
     private readonly BybitApiService _apiService;
+    public ISeries[] Series { get; set; } = Array.Empty<ISeries>();
+
+    public Axis[] XAxes { get; set; } = new[]
+    {
+        new Axis
+        {
+            LabelsPaint = new SolidColorPaint(SKColors.White),
+            LabelsRotation = 45,
+            Labeler = value => new DateTime((long)value).ToString("MM/dd HH:mm"),
+            UnitWidth = TimeSpan.FromMinutes(1).Ticks
+        }
+    };
+
+    public Axis[] YAxes { get; set; } = new[]
+    {
+        new Axis
+        {
+            LabelsPaint = new SolidColorPaint(SKColors.White),
+            Position = LiveChartsCore.Measure.AxisPosition.End
+        }
+    };
 
     public string Crypto
     {
@@ -24,6 +50,7 @@ public partial class HistoryPage : ContentPage
     {
         InitializeComponent();
         _apiService = apiService;
+        BindingContext = this;
     }
 
     private async void LoadCryptoData()
@@ -32,63 +59,36 @@ public partial class HistoryPage : ContentPage
             return;
 
         CryptoNameLabel.Text = Crypto;
-        
+
         try
         {
-            // Clear previous data
-            HistoryContainer.Children.Clear();
-
             if (Crypto.Contains("Bitcoin"))
             {
                 var response = await _apiService.GetBitcoinDataAsync();
-                
+
                 if (response != null && response.RetCode == 0 && response.Result?.List?.Count > 0)
                 {
-                    foreach (var item in response.Result.List)
+                    var candlesticks = response.Result.List.Select(item => new FinancialPoint(
+                        item.GetStartDateTime(),
+                        (double)item.HighPrice,
+                        (double)item.OpenPrice,
+                        (double)item.ClosePrice,
+                        (double)item.LowPrice
+                    )).ToArray();
+
+                    Series = new ISeries[]
                     {
-                        var dateTime = item.GetStartDateTime().ToLocalTime();
-                        var frame = new Frame
+                        new CandlesticksSeries<FinancialPoint>
                         {
-                            BackgroundColor = Color.FromArgb("#2e2e2e"),
-                            CornerRadius = 8,
-                            Padding = new Thickness(15)
-                        };
+                            Values = candlesticks,
+                            UpStroke = new SolidColorPaint(SKColors.LightGreen) { StrokeThickness = 3 },
+                            DownStroke = new SolidColorPaint(SKColors.IndianRed) { StrokeThickness = 3 },
+                            UpFill = new SolidColorPaint(SKColors.LightGreen.WithAlpha(90)),
+                            DownFill = new SolidColorPaint(SKColors.IndianRed.WithAlpha(90))
+                        }
+                    };
 
-                        var layout = new StackLayout();
-                        layout.Children.Add(new Label
-                        {
-                            Text = $"{dateTime:g}",
-                            TextColor = Colors.White,
-                            FontAttributes = FontAttributes.Bold
-                        });
-                        
-                        layout.Children.Add(new Label
-                        {
-                            Text = $"Open: ${item.OpenPrice}",
-                            TextColor = Colors.LightGray
-                        });
-                        
-                        layout.Children.Add(new Label
-                        {
-                            Text = $"Close: ${item.ClosePrice}",
-                            TextColor = Colors.LightGray
-                        });
-                        
-                        layout.Children.Add(new Label
-                        {
-                            Text = $"High: ${item.HighPrice}",
-                            TextColor = Colors.LightGreen
-                        });
-                        
-                        layout.Children.Add(new Label
-                        {
-                            Text = $"Low: ${item.LowPrice}",
-                            TextColor = Colors.IndianRed
-                        });
-
-                        frame.Content = layout;
-                        HistoryContainer.Children.Add(frame);
-                    }
+                    OnPropertyChanged(nameof(Series));
                 }
                 else
                 {
@@ -97,8 +97,6 @@ public partial class HistoryPage : ContentPage
             }
             else
             {
-                // For other cryptocurrencies we would implement similar code
-                // For now, just show a message
                 ShowErrorMessage($"History data for {Crypto} is not available yet.");
             }
         }
@@ -110,21 +108,25 @@ public partial class HistoryPage : ContentPage
 
     private void ShowErrorMessage(string message)
     {
-        var frame = new Frame
+        var border = new Border
         {
             BackgroundColor = Color.FromArgb("#2e2e2e"),
-            CornerRadius = 8,
+            StrokeShape = new RoundRectangle
+            {
+                CornerRadius = new CornerRadius(8)
+            },
             Padding = new Thickness(15)
         };
 
-        frame.Content = new Label
+        border.Content = new Label
         {
             Text = message,
             TextColor = Colors.IndianRed
         };
 
-        HistoryContainer.Children.Clear();
-        HistoryContainer.Children.Add(frame);
+        // Update the chart area to show the error instead
+        Series = Array.Empty<ISeries>();
+        OnPropertyChanged(nameof(Series));
     }
 
     private async void OnBackClicked(object sender, EventArgs e)
