@@ -25,7 +25,7 @@ public partial class HistoryPage : ContentPage
     private TimeframeOption _selectedTimeframe = TimeframeOption.LastDay; // Default to last day
 
     // Properties for the Picker binding
-    public List<string> TimeframeOptions { get; } = new List<string> { "Last Day", "Last Week", "Last Month", "Last Year" };
+    public List<string> TimeframeOptions { get; } = new() { "Last Day", "Last Week", "Last Month", "Last Year" };
 
     public int SelectedTimeframeIndex
     {
@@ -42,6 +42,7 @@ public partial class HistoryPage : ContentPage
 
     public ISeries[] Series { get; set; } = Array.Empty<ISeries>();
     public Axis[] XAxes { get; set; }
+
     public Axis[] YAxes { get; set; } = new[]
     {
         new Axis
@@ -102,7 +103,7 @@ public partial class HistoryPage : ContentPage
                     startTimeMillis = now.AddDays(-1).ToUnixTimeMilliseconds();
                     break;
                 case TimeframeOption.LastWeek:
-                    interval = 720; // 12 hours (720 minutes)
+                    interval = 360; // 6 hours (360 minutes)
                     startTimeMillis = now.AddDays(-7).ToUnixTimeMilliseconds();
                     break;
                 case TimeframeOption.LastMonth:
@@ -178,7 +179,7 @@ public partial class HistoryPage : ContentPage
                 break;
             case TimeframeOption.LastWeek:
                 dateFormat = "dd/MM HH:mm";
-                unitWidth = TimeSpan.FromMinutes(720);
+                unitWidth = TimeSpan.FromMinutes(360);
                 break;
             case TimeframeOption.LastMonth:
                 dateFormat = "dd/MM";

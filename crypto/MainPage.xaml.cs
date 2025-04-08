@@ -42,13 +42,8 @@ public partial class MainPage : ContentPage
 
                     // Assign to the appropriate reference based on the crypto name
                     if (cryptoLabel.Text.Contains("Bitcoin"))
-                    {
                         _bitcoinPriceLabel = priceLabel;
-                    }
-                    else if (cryptoLabel.Text.Contains("Ethereum"))
-                    {
-                        _ethereumPriceLabel = priceLabel;
-                    }
+                    else if (cryptoLabel.Text.Contains("Ethereum")) _ethereumPriceLabel = priceLabel;
                 }
             }
         }
@@ -104,30 +99,6 @@ public partial class MainPage : ContentPage
             else if (e.Symbol == "ETHUSDT" && _ethereumPriceLabel != null)
                 _ethereumPriceLabel.Text = $"${e.Price:N2}";
         });
-    }
-
-    private void UpdateEthereumPrice(decimal price)
-    {
-        foreach (var frame in FindVisualChildren<Frame>(this))
-        {
-            var stackLayout = frame.Content as StackLayout;
-            if (stackLayout != null)
-            {
-                var cryptoLabel = stackLayout.Children.FirstOrDefault(c => c is Label) as Label;
-                if (cryptoLabel != null && cryptoLabel.Text != null && cryptoLabel.Text.Contains("Ethereum"))
-                {
-                    // Found the Ethereum frame
-                    var ethPriceLabel = stackLayout.Children
-                        .Where(c => c is Label)
-                        .Cast<Label>()
-                        .Skip(1)
-                        .FirstOrDefault();
-
-                    if (ethPriceLabel != null) ethPriceLabel.Text = $"${price:N2}";
-                    break;
-                }
-            }
-        }
     }
 
     private async void OnViewHistoryClicked(object sender, EventArgs e)

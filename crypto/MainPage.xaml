@@ -36,13 +36,15 @@
             <Setter Property="CornerRadius"
                     Value="15" />
             <Setter Property="HeightRequest"
-                    Value="35" />
+                    Value="40" />
             <Setter Property="HorizontalOptions"
                     Value="End" />
+            <Setter Property="VerticalOptions"
+                    Value="Center" />
             <Setter Property="Padding"
-                    Value="10,0" />
+                    Value="15,0" />
             <Setter Property="FontSize"
-                    Value="12" />
+                    Value="14" />
         </Style>
     </ContentPage.Resources>
 
@@ -66,14 +68,15 @@
             <!-- Example card for a cryptocurrency -->
             <Frame BackgroundColor="#2e2e2e"
                    CornerRadius="10"
-                   Margin="0,10">
+                   Margin="0,10"
+                   Padding="10">
                 <StackLayout Padding="15">
                     <Label Text="Bitcoin (BTC)"
                            TextColor="White"
-                           FontSize="20" />
+                           FontSize="24" />
                     <Label Text="$27,000"
                            TextColor="#4CAF50"
-                           FontSize="16" />
+                           FontSize="24" />
                     <Button Text="View History"
                             Style="{StaticResource HistoryButton}"
                             Clicked="OnViewHistoryClicked" />
@@ -81,14 +84,15 @@
             </Frame>
             <Frame BackgroundColor="#2e2e2e"
                    CornerRadius="10"
-                   Margin="0,10">
+                   Margin="0,10"
+                   Padding="10">
                 <StackLayout Padding="15">
                     <Label Text="Ethereum (ETH)"
                            TextColor="White"
-                           FontSize="20" />
+                           FontSize="24" />
                     <Label Text="$1,800"
                            TextColor="#4CAF50"
-                           FontSize="16" />
+                           FontSize="24" />
                     <Button Text="View History"
                             Style="{StaticResource HistoryButton}"
                             Clicked="OnViewHistoryClicked" />
