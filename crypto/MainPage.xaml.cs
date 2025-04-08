@@ -27,23 +27,28 @@ public partial class MainPage : ContentPage
         // Search through the visual tree for both Bitcoin and Ethereum frames
         foreach (var frame in FindVisualChildren<Frame>(this))
         {
-            var stackLayout = frame.Content as StackLayout;
-            if (stackLayout != null)
+            var grid = frame.Content as Grid;
+            if (grid != null)
             {
-                var cryptoLabel = stackLayout.Children.FirstOrDefault(c => c is Label) as Label;
-                if (cryptoLabel != null && cryptoLabel.Text != null)
+                var stackLayout = grid.Children.FirstOrDefault(c => c is StackLayout) as StackLayout;
+                if (stackLayout != null)
                 {
-                    // Get the second Label which should be the price
-                    var priceLabel = stackLayout.Children
-                        .Where(c => c is Label)
-                        .Cast<Label>()
-                        .Skip(1)
-                        .FirstOrDefault();
+                    var cryptoLabel = stackLayout.Children.FirstOrDefault(c => c is Label) as Label;
+                    if (cryptoLabel != null && cryptoLabel.Text != null)
+                    {
+                        // Get the second Label which should be the price
+                        var priceLabel = stackLayout.Children
+                            .Where(c => c is Label)
+                            .Cast<Label>()
+                            .Skip(1)
+                            .FirstOrDefault();
 
-                    // Assign to the appropriate reference based on the crypto name
-                    if (cryptoLabel.Text.Contains("Bitcoin"))
-                        _bitcoinPriceLabel = priceLabel;
-                    else if (cryptoLabel.Text.Contains("Ethereum")) _ethereumPriceLabel = priceLabel;
+                        // Assign to the appropriate reference based on the crypto name
+                        if (cryptoLabel.Text.Contains("Bitcoin"))
+                            _bitcoinPriceLabel = priceLabel;
+                        else if (cryptoLabel.Text.Contains("Ethereum"))
+                            _ethereumPriceLabel = priceLabel;
+                    }
                 }
             }
         }
@@ -103,14 +108,22 @@ public partial class MainPage : ContentPage
 
     private async void OnViewHistoryClicked(object sender, EventArgs e)
     {
-        // Get the cryptocurrency name from the button's parent StackLayout
-        if (sender is Button button && button.Parent is StackLayout stackLayout)
-            // The first Label in the StackLayout contains the cryptocurrency name
-            if (stackLayout.Children.FirstOrDefault(c => c is Label) is Label cryptoLabel)
+        // Get the cryptocurrency name from the button's parent Grid
+        if (sender is Button button && button.Parent is Grid grid)
+        {
+            // Find the StackLayout in the same Grid
+            var stackLayout = grid.Children.FirstOrDefault(c => c is StackLayout) as StackLayout;
+            if (stackLayout != null)
             {
-                var cryptoName = cryptoLabel.Text;
-                // Navigate to history page with the selected cryptocurrency
-                await Shell.Current.GoToAsync($"HistoryPage?Crypto={cryptoName}");
+                // The first Label in the StackLayout contains the cryptocurrency name
+                var cryptoLabel = stackLayout.Children.FirstOrDefault(c => c is Label) as Label;
+                if (cryptoLabel != null)
+                {
+                    var cryptoName = cryptoLabel.Text;
+                    // Navigate to history page with the selected cryptocurrency
+                    await Shell.Current.GoToAsync($"HistoryPage?Crypto={cryptoName}");
+                }
             }
+        }
     }
 }

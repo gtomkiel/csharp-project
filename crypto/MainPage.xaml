@@ -4,100 +4,113 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="crypto.MainPage"
              BackgroundColor="#1e1e1e">
-    <ContentPage.Resources>
-        <Style TargetType="Label"
-               x:Key="HeaderLabel">
-            <Setter Property="TextColor"
-                    Value="White" />
-            <Setter Property="FontSize"
-                    Value="32" />
-            <Setter Property="HorizontalOptions"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="0,20,0,10" />
-        </Style>
-        <Style TargetType="Label"
-               x:Key="SubHeaderLabel">
-            <Setter Property="TextColor"
-                    Value="#CCCCCC" />
-            <Setter Property="FontSize"
-                    Value="18" />
-            <Setter Property="HorizontalOptions"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="0,0,0,20" />
-        </Style>
-        <Style TargetType="Button"
-               x:Key="HistoryButton">
-            <Setter Property="BackgroundColor"
-                    Value="#3498db" />
-            <Setter Property="TextColor"
-                    Value="White" />
-            <Setter Property="CornerRadius"
-                    Value="15" />
-            <Setter Property="HeightRequest"
-                    Value="40" />
-            <Setter Property="HorizontalOptions"
-                    Value="End" />
-            <Setter Property="VerticalOptions"
-                    Value="Center" />
-            <Setter Property="Padding"
-                    Value="15,0" />
-            <Setter Property="FontSize"
-                    Value="14" />
-        </Style>
-    </ContentPage.Resources>
+        <ContentPage.Resources>
+                <Style TargetType="Label"
+                       x:Key="HeaderLabel">
+                        <Setter Property="TextColor"
+                                Value="White"/>
+                        <Setter Property="FontSize"
+                                Value="32"/>
+                        <Setter Property="HorizontalOptions"
+                                Value="Center"/>
+                        <Setter Property="Margin"
+                                Value="0,20,0,10"/>
+                </Style>
+                <Style TargetType="Label"
+                       x:Key="SubHeaderLabel">
+                        <Setter Property="TextColor"
+                                Value="#CCCCCC"/>
+                        <Setter Property="FontSize"
+                                Value="18"/>
+                        <Setter Property="HorizontalOptions"
+                                Value="Center"/>
+                        <Setter Property="Margin"
+                                Value="0,0,0,20"/>
+                </Style>
+                <Style TargetType="Button"
+                       x:Key="HistoryButton">
+                        <Setter Property="BackgroundColor"
+                                Value="#3498db"/>
+                        <Setter Property="TextColor"
+                                Value="White"/>
+                        <Setter Property="CornerRadius"
+                                Value="15"/>
+                        <Setter Property="HeightRequest"
+                                Value="40"/>
+                        <Setter Property="HorizontalOptions"
+                                Value="End"/>
+                        <Setter Property="VerticalOptions"
+                                Value="Center"/>
+                        <Setter Property="Padding"
+                                Value="15,0"/>
+                        <Setter Property="FontSize"
+                                Value="14"/>
+                </Style>
+        </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,*"
-          Padding="20">
-        <!-- Header Section -->
-        <StackLayout Grid.Row="0"
-                     VerticalOptions="CenterAndExpand">
-            <Image Source="crypto_logo.png"
-                   HeightRequest="100"
-                   HorizontalOptions="Center"
-                   Margin="0,30" />
-            <Label Text="Crypto Price Checker"
-                   Style="{StaticResource HeaderLabel}" />
-            <Label Text="Track real-time cryptocurrency prices"
-                   Style="{StaticResource SubHeaderLabel}" />
-        </StackLayout>
+        <Grid RowDefinitions="Auto,*"
+              Padding="20">
+                <!-- Header Section -->
+                <StackLayout Grid.Row="0"
+                             VerticalOptions="CenterAndExpand">
+                        <Image Source="crypto_logo.png"
+                               HeightRequest="100"
+                               HorizontalOptions="Center"
+                               Margin="0,30"/>
+                        <Label Text="Crypto Price Checker"
+                               Style="{StaticResource HeaderLabel}"/>
+                        <Label Text="Track real-time cryptocurrency prices"
+                               Style="{StaticResource SubHeaderLabel}"/>
+                </StackLayout>
 
-        <!-- Content Section -->
-        <StackLayout Grid.Row="1">
-            <!-- Example card for a cryptocurrency -->
-            <Frame BackgroundColor="#2e2e2e"
-                   CornerRadius="10"
-                   Margin="0,10"
-                   Padding="10">
-                <StackLayout Padding="15">
-                    <Label Text="Bitcoin (BTC)"
-                           TextColor="White"
-                           FontSize="24" />
-                    <Label Text="$27,000"
-                           TextColor="#4CAF50"
-                           FontSize="24" />
-                    <Button Text="View History"
-                            Style="{StaticResource HistoryButton}"
-                            Clicked="OnViewHistoryClicked" />
+                <!-- Content Section -->
+                <StackLayout Grid.Row="1"
+                                Spacing="8">
+                        <!-- Bitcoin card with Grid layout -->
+                        <Frame BackgroundColor="#2e2e2e"
+                               CornerRadius="10"
+                               Margin="0,5"
+                               Padding="10, 5">
+                                <Grid ColumnDefinitions="*, Auto">
+                                        <StackLayout Spacing="0"
+                                                        VerticalOptions="Center">
+                                                <Label Text="Bitcoin (BTC)"
+                                                       TextColor="White"
+                                                       FontSize="20"/>
+                                                <Label Text="$27,000"
+                                                       TextColor="#4CAF50"
+                                                       FontSize="20"/>
+                                        </StackLayout>
+                                        <Button Grid.Column="1"
+                                                Text="View History"
+                                                Style="{StaticResource HistoryButton}"
+                                                VerticalOptions="Center"
+                                                Clicked="OnViewHistoryClicked"/>
+                                </Grid>
+                        </Frame>
+
+                        <!-- Ethereum card with Grid layout -->
+                        <Frame BackgroundColor="#2e2e2e"
+                               CornerRadius="10"
+                               Margin="0,5"
+                               Padding="10, 5">
+                                <Grid ColumnDefinitions="*, Auto">
+                                        <StackLayout Spacing="0"
+                                                        VerticalOptions="Center">
+                                                <Label Text="Ethereum (ETH)"
+                                                       TextColor="White"
+                                                       FontSize="20"/>
+                                                <Label Text="$1,800"
+                                                       TextColor="#4CAF50"
+                                                       FontSize="20"/>
+                                        </StackLayout>
+                                        <Button Grid.Column="1"
+                                                Text="View History"
+                                                Style="{StaticResource HistoryButton}"
+                                                VerticalOptions="Center"
+                                                Clicked="OnViewHistoryClicked"/>
+                                </Grid>
+                        </Frame>
                 </StackLayout>
-            </Frame>
-            <Frame BackgroundColor="#2e2e2e"
-                   CornerRadius="10"
-                   Margin="0,10"
-                   Padding="10">
-                <StackLayout Padding="15">
-                    <Label Text="Ethereum (ETH)"
-                           TextColor="White"
-                           FontSize="24" />
-                    <Label Text="$1,800"
-                           TextColor="#4CAF50"
-                           FontSize="24" />
-                    <Button Text="View History"
-                            Style="{StaticResource HistoryButton}"
-                            Clicked="OnViewHistoryClicked" />
-                </StackLayout>
-            </Frame>
-        </StackLayout>
-    </Grid>
+        </Grid>
 </ContentPage>
