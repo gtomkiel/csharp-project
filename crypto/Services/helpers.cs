@@ -25,7 +25,7 @@ public class BybitApiService
     /// <param name="interval">Time interval in minutes (e.g., 60 for 1 hour)</param>
     /// <param name="startTime">Start time in Unix timestamp milliseconds</param>
     /// <param name="endTime">End time in Unix timestamp milliseconds</param>
-    /// <param name="category">Market category (default: inverse)</param>
+    /// <param name="category">Market category (default: linear)</param>
     /// <returns>KlineResponse object containing the API response data</returns>
     public async Task<KlineResponse> GetKlineDataAsync(
         string symbol,
@@ -55,6 +55,7 @@ public class BybitApiService
     public async Task<KlineResponse> GetBitcoinDataAsync()
     {
         // These are the values from the URL in the prompt
+        Console.WriteLine("REQUESTING BITCOIN PRICE");
         return await GetKlineDataAsync("BTCUSDT", 1, 1670601600000, 1670608800000);
     }
 }
@@ -94,10 +95,7 @@ public class KlineArrayConverter : JsonConverter<List<KlineItem>>
 {
     public override List<KlineItem> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        if (reader.TokenType != JsonTokenType.StartArray)
-        {
-            throw new JsonException("Expected start of array");
-        }
+        if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException("Expected start of array");
 
         var klineItems = new List<KlineItem>();
 
@@ -105,58 +103,40 @@ public class KlineArrayConverter : JsonConverter<List<KlineItem>>
         reader.Read();
         while (reader.TokenType != JsonTokenType.EndArray)
         {
-            if (reader.TokenType != JsonTokenType.StartArray)
-            {
-                throw new JsonException("Expected start of inner array");
-            }
+            if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException("Expected start of inner array");
 
             var klineItem = new KlineItem();
             reader.Read(); // Move to first value
 
             // Read values in order: startTime, openPrice, highPrice, lowPrice, closePrice
             if (reader.TokenType == JsonTokenType.String)
-            {
-                if (long.TryParse(reader.GetString(), out long startTime))
-                {
+                if (long.TryParse(reader.GetString(), out var startTime))
                     klineItem.StartTime = startTime;
-                }
-            }
+
             reader.Read();
 
             if (reader.TokenType == JsonTokenType.String)
-            {
-                if (decimal.TryParse(reader.GetString(), out decimal openPrice))
-                {
+                if (decimal.TryParse(reader.GetString(), out var openPrice))
                     klineItem.OpenPrice = openPrice;
-                }
-            }
+
             reader.Read();
 
             if (reader.TokenType == JsonTokenType.String)
-            {
-                if (decimal.TryParse(reader.GetString(), out decimal highPrice))
-                {
+                if (decimal.TryParse(reader.GetString(), out var highPrice))
                     klineItem.HighPrice = highPrice;
-                }
-            }
+
             reader.Read();
 
             if (reader.TokenType == JsonTokenType.String)
-            {
-                if (decimal.TryParse(reader.GetString(), out decimal lowPrice))
-                {
+                if (decimal.TryParse(reader.GetString(), out var lowPrice))
                     klineItem.LowPrice = lowPrice;
-                }
-            }
+
             reader.Read();
 
             if (reader.TokenType == JsonTokenType.String)
-            {
-                if (decimal.TryParse(reader.GetString(), out decimal closePrice))
-                {
+                if (decimal.TryParse(reader.GetString(), out var closePrice))
                     klineItem.ClosePrice = closePrice;
-                }
-            }
+
             reader.Read(); // Move to end of inner array
 
             klineItems.Add(klineItem);
@@ -191,8 +171,6 @@ public class KlineArrayConverter : JsonConverter<List<KlineItem>>
 /// </summary>
 public class KlineItem
 {
-    // The order of these properties should match the array order in the API response
-
     public long StartTime { get; set; }
 
     public decimal OpenPrice { get; set; }
