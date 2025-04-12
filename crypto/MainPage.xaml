@@ -65,7 +65,7 @@
 
                 <!-- Content Section -->
                 <StackLayout Grid.Row="1"
-                                Spacing="8">
+                             Spacing="8">
                         <!-- Bitcoin card with Grid layout -->
                         <Frame BackgroundColor="#2e2e2e"
                                CornerRadius="10"
@@ -73,7 +73,7 @@
                                Padding="10, 5">
                                 <Grid ColumnDefinitions="*, Auto">
                                         <StackLayout Spacing="0"
-                                                        VerticalOptions="Center">
+                                                     VerticalOptions="Center">
                                                 <Label Text="Bitcoin (BTC)"
                                                        TextColor="White"
                                                        FontSize="20"/>
@@ -96,7 +96,7 @@
                                Padding="10, 5">
                                 <Grid ColumnDefinitions="*, Auto">
                                         <StackLayout Spacing="0"
-                                                        VerticalOptions="Center">
+                                                     VerticalOptions="Center">
                                                 <Label Text="Ethereum (ETH)"
                                                        TextColor="White"
                                                        FontSize="20"/>
