@@ -25,13 +25,15 @@ public class BybitWebSocketService
     private bool _isRunning;
     private List<string> _subscribedSymbols = new List<string>();
     private readonly SemaphoreSlim _webSocketSemaphore = new SemaphoreSlim(1, 1);
+    private readonly CryptoThreadPoolService _threadPool;
 
     public event EventHandler<PriceUpdateEventArgs> OnPriceUpdate;
 
-    public BybitWebSocketService()
+    public BybitWebSocketService(CryptoThreadPoolService threadPool = null)
     {
         _webSocket = new ClientWebSocket();
         _cancellationTokenSource = new CancellationTokenSource();
+        _threadPool = threadPool ?? new CryptoThreadPoolService();
     }
 
     public async Task StartAsync(params string[] symbols)
@@ -142,13 +144,19 @@ public class BybitWebSocketService
 
                 if (message.Length > 0)
                 {
-                    ProcessMessage(message.ToString());
+                    // Use thread pool to process messages asynchronously
+                    var messageContent = message.ToString();
+                    await _threadPool.EnqueueTaskAsync(
+                        $"process_ws_message_{DateTime.UtcNow.Ticks}",
+                        (token) => Task.Run(() => ProcessMessage(messageContent), token)
+                    );
                 }
             }
         }
         catch (OperationCanceledException)
         {
             // Normal cancellation
+            Console.WriteLine("WebSocket receive operation was canceled");
         }
         catch (Exception ex)
         {
@@ -219,29 +227,30 @@ public class BybitWebSocketService
 
     private async Task SendPongAsync()
     {
+        var pongMessage = new { op = "pong" };
+        var pongJson = JsonSerializer.Serialize(pongMessage);
+        var pongBytes = Encoding.UTF8.GetBytes(pongJson);
+
+        await _webSocketSemaphore.WaitAsync();
         try
         {
-            await _webSocketSemaphore.WaitAsync();
-            try
+            if (_webSocket.State == WebSocketState.Open)
             {
-                var pongMessage = new { op = "pong" };
-                var pongJson = JsonSerializer.Serialize(pongMessage);
-                var pongBytes = Encoding.UTF8.GetBytes(pongJson);
-
                 await _webSocket.SendAsync(
                     new ArraySegment<byte>(pongBytes),
                     WebSocketMessageType.Text,
                     true,
                     CancellationToken.None);
-            }
-            finally
-            {
-                _webSocketSemaphore.Release();
+                Console.WriteLine("Pong sent to keep connection alive");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error sending pong: {ex.Message}");
+        }
+        finally
+        {
+            _webSocketSemaphore.Release();
         }
     }
 }

@@ -5,17 +5,20 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System;
+using System.Threading;
 
 namespace crypto.Services;
 
 public class BybitApiService
 {
     private readonly HttpClient _httpClient;
+    private readonly CryptoThreadPoolService _threadPool;
     private const string baseUrl = "https://api.bybit.nl/v5/market/index-price-kline";
 
-    public BybitApiService()
+    public BybitApiService(CryptoThreadPoolService threadPool = null)
     {
         _httpClient = new HttpClient();
+        _threadPool = threadPool ?? new CryptoThreadPoolService();
     }
 
     /// <summary>
@@ -60,6 +63,106 @@ public class BybitApiService
     {
         Console.WriteLine($"REQUESTING {symbol} PRICE - Interval: {interval}, Start: {new DateTimeOffset(DateTimeOffset.FromUnixTimeMilliseconds(startTime).DateTime).ToString()}");
         return await GetKlineDataAsync(symbol, interval, startTime, endTime);
+    }
+
+    /// <summary>
+    /// Fetches data for multiple tokens in parallel using the thread pool
+    /// </summary>
+    /// <param name="symbols">List of token symbols to fetch</param>
+    /// <param name="interval">Time interval</param>
+    /// <param name="startTime">Start time in Unix timestamp milliseconds</param>
+    /// <param name="endTime">End time in Unix timestamp milliseconds</param>
+    /// <returns>Dictionary mapping symbols to their respective data responses</returns>
+    public async Task<Dictionary<string, KlineResponse>> GetMultipleTokensDataAsync(
+        IEnumerable<string> symbols,
+        object interval,
+        long startTime,
+        long endTime)
+    {
+        var results = new Dictionary<string, KlineResponse>();
+        var tasks = new List<Task>();
+
+        foreach (var symbol in symbols)
+        {
+            var task = _threadPool.EnqueueTaskWithResultAsync<KlineResponse>(
+                $"fetch_{symbol}_{interval}",
+                async (cancellationToken) =>
+                {
+                    return await GetTokenDataAsync(symbol, interval, startTime, endTime);
+                }
+            ).ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully && t.Result != null)
+                {
+                    lock (results)
+                    {
+                        results[symbol] = t.Result;
+                    }
+                }
+            });
+
+            tasks.Add(task);
+        }
+
+        // Wait for all tasks to complete
+        await Task.WhenAll(tasks);
+        return results;
+    }
+
+    /// <summary>
+    /// Performs batch processing of data for a symbol over multiple time intervals
+    /// </summary>
+    /// <param name="symbol">The token symbol</param>
+    /// <param name="intervalList">List of intervals to process</param>
+    /// <param name="startTime">Start time</param>
+    /// <param name="endTime">End time</param>
+    /// <returns>Dictionary mapping intervals to their respective data responses</returns>
+    public async Task<Dictionary<object, KlineResponse>> ProcessSymbolBatchAsync(
+        string symbol,
+        IEnumerable<object> intervalList,
+        long startTime,
+        long endTime)
+    {
+        var results = new Dictionary<object, KlineResponse>();
+        var tasks = new List<Task>();
+
+        foreach (var interval in intervalList)
+        {
+            var task = _threadPool.EnqueueTaskWithResultAsync<KlineResponse>(
+                $"process_{symbol}_{interval}",
+                async (cancellationToken) =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        return null;
+                    }
+                    return await GetTokenDataAsync(symbol, interval, startTime, endTime);
+                }
+            ).ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully && t.Result != null)
+                {
+                    lock (results)
+                    {
+                        results[interval] = t.Result;
+                    }
+                }
+            });
+
+            tasks.Add(task);
+        }
+
+        await Task.WhenAll(tasks);
+        return results;
+    }
+
+    /// <summary>
+    /// Disposes resources used by the service
+    /// </summary>
+    public void Dispose()
+    {
+        _httpClient?.Dispose();
+        (_threadPool as IDisposable)?.Dispose();
     }
 }
 

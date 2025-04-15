@@ -21,6 +21,10 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        // Register thread pool service first as it's a dependency for other services
+        builder.Services.AddSingleton<CryptoThreadPoolService>(sp => 
+            new CryptoThreadPoolService(Environment.ProcessorCount));
+            
         // Register services
         builder.Services.AddSingleton<BybitApiService>();
         builder.Services.AddSingleton<BybitWebSocketService>();
