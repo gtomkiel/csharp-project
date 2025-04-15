@@ -1,4 +1,7 @@
-﻿namespace crypto;
+﻿using LiveChartsCore;
+using LiveChartsCore.Kernel;
+
+namespace crypto;
 
 public partial class App : Application
 {
@@ -9,6 +12,21 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new AppShell());
+        var window = new Window(new AppShell());
+
+        window.MinimumWidth = 1200;
+        window.MinimumHeight = 800;
+
+        return window;
     }
+
+    protected override void OnStart()
+    {
+        LiveCharts.Configure(config =>
+            config
+                .HasMap<City>((city, index) => new Coordinate(index, city.Population))
+        );
+    }
+
+    public record City(string Name, double Population);
 }

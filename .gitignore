@@ -1,1 +1,24 @@
+# MacOS
 .DS_Store
+
+# VS Code
+.vscode/
+
+# IntelliJ
+.idea/
+
+# Build
+Debug/
+Release/
+obj/
+
+# User-specific files
+*.user
+
+# NuGet
+*.cache
+*.csproj.nuget.dgspec.json
+*.csproj.nuget.g.*
+project.packagespec.json
+*.project.**
+.vs

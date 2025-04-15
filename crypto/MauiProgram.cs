@@ -1,4 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using crypto.Services;
+using crypto.Views;
+using LiveChartsCore.SkiaSharpView.Maui;
+using Microsoft.Extensions.Logging;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace crypto;
 
@@ -8,12 +12,25 @@ public static class MauiProgram
     {
         var builder = MauiApp.CreateBuilder();
         builder
+            .UseSkiaSharp()
+            .UseLiveCharts()
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
+
+        // Register thread pool service first as it's a dependency for other services
+        builder.Services.AddSingleton<CryptoThreadPoolService>(sp => 
+            new CryptoThreadPoolService(Environment.ProcessorCount));
+            
+        // Register services
+        builder.Services.AddSingleton<BybitApiService>();
+        builder.Services.AddSingleton<BybitWebSocketService>();
+
+        // Register pages
+        builder.Services.AddTransient<HistoryPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();
