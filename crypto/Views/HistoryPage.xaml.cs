@@ -5,6 +5,7 @@ using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.Defaults;
 using SkiaSharp;
 using Microsoft.Maui.Controls.Shapes;
+using System.Collections.Generic;
 
 namespace crypto.Views;
 
@@ -23,6 +24,16 @@ public partial class HistoryPage : ContentPage
     private string _crypto = string.Empty;
     private readonly BybitApiService _apiService;
     private TimeframeOption _selectedTimeframe = TimeframeOption.LastDay; // Default to last day
+
+    // Dictionary mapping crypto display names to symbols
+    private static readonly Dictionary<string, string> CryptoSymbols = new Dictionary<string, string>
+    {
+        { "Bitcoin (BTC)", "BTCUSDT" },
+        { "Ethereum (ETH)", "ETHUSDT" },
+        { "Solana (SOL)", "SOLUSDT" },
+        { "Binance Coin (BNB)", "BNBUSDT" },
+        { "Ripple (XRP)", "XRPUSDT" }
+    };
 
     // Properties for the Picker binding
     public List<string> TimeframeOptions { get; } = new() { "Last Day", "Last Week", "Last Month", "Last Year" };
@@ -249,11 +260,33 @@ public partial class HistoryPage : ContentPage
 
     private string GetSymbolFromCryptoName(string cryptoName)
     {
-        if (cryptoName.Contains("Bitcoin"))
-            return "BTCUSDT";
-        else if (cryptoName.Contains("Ethereum"))
-            return "ETHUSDT";
-        else
-            return string.Empty;
+        // First, try an exact match in our dictionary
+        if (CryptoSymbols.TryGetValue(cryptoName, out string symbol))
+        {
+            return symbol;
+        }
+        
+        // If not found, try a partial match (for backward compatibility)
+        foreach (var kvp in CryptoSymbols)
+        {
+            if (cryptoName.Contains(kvp.Key) || kvp.Key.Contains(cryptoName))
+            {
+                return kvp.Value;
+            }
+        }
+        
+        // If still not found, try to extract the symbol from parentheses
+        // Example: "Bitcoin (BTC)" -> extract "BTC" and append "USDT"
+        var match = System.Text.RegularExpressions.Regex.Match(cryptoName, @"\(([^)]*)\)");
+        if (match.Success && match.Groups.Count > 1)
+        {
+            string extractedSymbol = match.Groups[1].Value;
+            if (!string.IsNullOrEmpty(extractedSymbol))
+            {
+                return $"{extractedSymbol}USDT";
+            }
+        }
+        
+        return string.Empty;
     }
 }

@@ -46,6 +46,25 @@
                         <Setter Property="FontSize"
                                 Value="14"/>
                 </Style>
+                <Style TargetType="Button"
+                       x:Key="AddCryptoButton">
+                        <Setter Property="BackgroundColor"
+                                Value="#2ecc71"/>
+                        <Setter Property="TextColor"
+                                Value="White"/>
+                        <Setter Property="CornerRadius"
+                                Value="15"/>
+                        <Setter Property="HeightRequest"
+                                Value="50"/>
+                        <Setter Property="HorizontalOptions"
+                                Value="Center"/>
+                        <Setter Property="Margin"
+                                Value="0,20,0,0"/>
+                        <Setter Property="Padding"
+                                Value="20,0"/>
+                        <Setter Property="FontSize"
+                                Value="16"/>
+                </Style>
         </ContentPage.Resources>
 
         <Grid RowDefinitions="Auto,*"
@@ -64,53 +83,15 @@
                 </StackLayout>
 
                 <!-- Content Section -->
-                <StackLayout Grid.Row="1"
-                             Spacing="8">
-                        <!-- Bitcoin card with Grid layout -->
-                        <Frame BackgroundColor="#2e2e2e"
-                               CornerRadius="10"
-                               Margin="0,5"
-                               Padding="10, 5">
-                                <Grid ColumnDefinitions="*, Auto">
-                                        <StackLayout Spacing="0"
-                                                     VerticalOptions="Center">
-                                                <Label Text="Bitcoin (BTC)"
-                                                       TextColor="White"
-                                                       FontSize="20"/>
-                                                <Label Text="$27,000"
-                                                       TextColor="#4CAF50"
-                                                       FontSize="20"/>
-                                        </StackLayout>
-                                        <Button Grid.Column="1"
-                                                Text="View History"
-                                                Style="{StaticResource HistoryButton}"
-                                                VerticalOptions="Center"
-                                                Clicked="OnViewHistoryClicked"/>
-                                </Grid>
-                        </Frame>
-
-                        <!-- Ethereum card with Grid layout -->
-                        <Frame BackgroundColor="#2e2e2e"
-                               CornerRadius="10"
-                               Margin="0,5"
-                               Padding="10, 5">
-                                <Grid ColumnDefinitions="*, Auto">
-                                        <StackLayout Spacing="0"
-                                                     VerticalOptions="Center">
-                                                <Label Text="Ethereum (ETH)"
-                                                       TextColor="White"
-                                                       FontSize="20"/>
-                                                <Label Text="$1,800"
-                                                       TextColor="#4CAF50"
-                                                       FontSize="20"/>
-                                        </StackLayout>
-                                        <Button Grid.Column="1"
-                                                Text="View History"
-                                                Style="{StaticResource HistoryButton}"
-                                                VerticalOptions="Center"
-                                                Clicked="OnViewHistoryClicked"/>
-                                </Grid>
-                        </Frame>
-                </StackLayout>
+                <ScrollView Grid.Row="1">
+                    <StackLayout x:Name="CryptoCardsContainer" Spacing="8">
+                        <!-- Crypto cards will be added dynamically in code -->
+                        
+                        <!-- Add Crypto Button -->
+                        <Button Text="+ Add Cryptocurrency" 
+                                Style="{StaticResource AddCryptoButton}"
+                                Clicked="OnAddCryptoClicked"/>
+                    </StackLayout>
+                </ScrollView>
         </Grid>
 </ContentPage>

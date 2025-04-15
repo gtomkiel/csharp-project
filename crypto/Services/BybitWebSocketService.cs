@@ -40,71 +40,154 @@ public class BybitWebSocketService
     public async Task StartAsync(params string[] symbols)
     {
         bool shouldConnect = false;
+        string[] symbolsToSubscribe;
         
-        lock (_stateLock)
+        await _webSocketSemaphore.WaitAsync();
+        try
         {
-            if (_isRunning)
-                return;
-                
-            // Default to BTCUSDT if no symbols provided
-            if (symbols == null || symbols.Length == 0)
+            lock (_stateLock)
             {
-                symbols = new[] { "BTCUSDT" };
-            }
-
-            _isRunning = true;
-            _webSocket = new ClientWebSocket();
-            _cancellationTokenSource = new CancellationTokenSource();
-            _subscribedSymbols = new List<string>(symbols);
-            shouldConnect = true;
-        }
-
-        if (shouldConnect)
-        {
-            try
-            {
-                await _webSocket.ConnectAsync(new Uri(BYBIT_WS_URL), _cancellationTokenSource.Token);
-
-                // Create topic strings for each symbol
-                var topics = symbols.Select(s => $"tickers.{s}").ToArray();
-
-                // Subscribe to all requested tickers
-                var subscribeMessage = new
+                // Default to BTCUSDT if no symbols provided
+                if (symbols == null || symbols.Length == 0)
                 {
-                    op = "subscribe",
-                    args = topics
-                };
-
-                var subscribeJson = JsonSerializer.Serialize(subscribeMessage);
-                var subscribeBytes = Encoding.UTF8.GetBytes(subscribeJson);
-
-                await _webSocketSemaphore.WaitAsync();
+                    symbols = new[] { "BTCUSDT" };
+                }
+                
+                // If already running, check if we need to add new symbols
+                if (_isRunning)
+                {
+                    // Find symbols that aren't already subscribed
+                    var newSymbols = symbols.Where(s => !_subscribedSymbols.Contains(s)).ToArray();
+                    if (newSymbols.Length == 0)
+                    {
+                        // Already subscribed to all requested symbols
+                        return;
+                    }
+                    
+                    // Add new symbols to our subscription list
+                    _subscribedSymbols.AddRange(newSymbols);
+                    symbolsToSubscribe = newSymbols;
+                    
+                    // Only subscribe to new symbols, no need to reconnect
+                    shouldConnect = false;
+                }
+                else
+                {
+                    // Not running yet, initialize everything
+                    _isRunning = true;
+                    _webSocket = new ClientWebSocket();
+                    _cancellationTokenSource = new CancellationTokenSource();
+                    _subscribedSymbols = new List<string>(symbols);
+                    symbolsToSubscribe = symbols;
+                    shouldConnect = true;
+                }
+            }
+            
+            if (shouldConnect)
+            {
                 try
                 {
-                    await _webSocket.SendAsync(
-                        new ArraySegment<byte>(subscribeBytes),
-                        WebSocketMessageType.Text,
-                        true,
-                        _cancellationTokenSource.Token);
-
-                    Console.WriteLine($"Sent subscription request for {string.Join(", ", topics)}");
+                    await _webSocket.ConnectAsync(new Uri(BYBIT_WS_URL), _cancellationTokenSource.Token);
+                    await SubscribeToSymbols(symbolsToSubscribe);
+                    
+                    // Start receiving messages once
+                    _ = ReceiveMessagesAsync();
                 }
-                finally
+                catch (Exception ex)
                 {
-                    _webSocketSemaphore.Release();
+                    Console.WriteLine($"WebSocket connection error: {ex.Message}");
+                    lock (_stateLock)
+                    {
+                        _isRunning = false;
+                    }
                 }
-
-                // Start receiving messages
-                _ = ReceiveMessagesAsync();
             }
-            catch (Exception ex)
+            else if (_webSocket.State == WebSocketState.Open)
             {
-                Console.WriteLine($"WebSocket connection error: {ex.Message}");
-                lock (_stateLock)
-                {
-                    _isRunning = false;
-                }
+                // Connection already open, just subscribe to new symbols
+                await SubscribeToSymbols(symbolsToSubscribe);
             }
+        }
+        finally
+        {
+            _webSocketSemaphore.Release();
+        }
+    }
+
+    private async Task SubscribeToSymbols(string[] symbols)
+    {
+        if (symbols == null || symbols.Length == 0)
+            return;
+            
+        // Create topic strings for each symbol
+        var topics = symbols.Select(s => $"tickers.{s}").ToArray();
+
+        // Subscribe to requested tickers
+        var subscribeMessage = new
+        {
+            op = "subscribe",
+            args = topics
+        };
+
+        var subscribeJson = JsonSerializer.Serialize(subscribeMessage);
+        var subscribeBytes = Encoding.UTF8.GetBytes(subscribeJson);
+
+        await _webSocket.SendAsync(
+            new ArraySegment<byte>(subscribeBytes),
+            WebSocketMessageType.Text,
+            true,
+            _cancellationTokenSource.Token);
+
+        Console.WriteLine($"Sent subscription request for {string.Join(", ", topics)}");
+    }
+
+    public async Task UnsubscribeFromSymbols(string[] symbols)
+    {
+        if (symbols == null || symbols.Length == 0)
+            return;
+            
+        await _webSocketSemaphore.WaitAsync();
+        try
+        {
+            if (!_isRunning || _webSocket.State != WebSocketState.Open)
+                return;
+                
+            // Create topic strings for each symbol
+            var topics = symbols.Select(s => $"tickers.{s}").ToArray();
+
+            // Unsubscribe from tickers
+            var unsubscribeMessage = new
+            {
+                op = "unsubscribe",
+                args = topics
+            };
+
+            var unsubscribeJson = JsonSerializer.Serialize(unsubscribeMessage);
+            var unsubscribeBytes = Encoding.UTF8.GetBytes(unsubscribeJson);
+
+            await _webSocket.SendAsync(
+                new ArraySegment<byte>(unsubscribeBytes),
+                WebSocketMessageType.Text,
+                true,
+                _cancellationTokenSource.Token);
+                
+            Console.WriteLine($"Sent unsubscription request for {string.Join(", ", topics)}");
+            
+            // Update subscribed symbols list
+            lock (_stateLock)
+            {
+                _subscribedSymbols = _subscribedSymbols
+                    .Where(s => !symbols.Contains(s))
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error unsubscribing from symbols: {ex.Message}");
+        }
+        finally
+        {
+            _webSocketSemaphore.Release();
         }
     }
 
@@ -121,6 +204,7 @@ public class BybitWebSocketService
             socketToClose = _webSocket;
             tokenSourceToCancel = _cancellationTokenSource;
             _isRunning = false;
+            _subscribedSymbols.Clear();
         }
 
         tokenSourceToCancel?.Cancel();
