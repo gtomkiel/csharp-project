@@ -26,6 +26,7 @@ public class BybitWebSocketService
     private List<string> _subscribedSymbols = new List<string>();
     private readonly SemaphoreSlim _webSocketSemaphore = new SemaphoreSlim(1, 1);
     private readonly CryptoThreadPoolService _threadPool;
+    private readonly object _stateLock = new object(); // Lock object for thread-safe state management
 
     public event EventHandler<PriceUpdateEventArgs> OnPriceUpdate;
 
@@ -38,77 +39,108 @@ public class BybitWebSocketService
 
     public async Task StartAsync(params string[] symbols)
     {
-        if (_isRunning)
-            return;
-
-        // Default to BTCUSDT if no symbols provided
-        if (symbols == null || symbols.Length == 0)
+        bool shouldConnect = false;
+        
+        lock (_stateLock)
         {
-            symbols = new[] { "BTCUSDT" };
+            if (_isRunning)
+                return;
+                
+            // Default to BTCUSDT if no symbols provided
+            if (symbols == null || symbols.Length == 0)
+            {
+                symbols = new[] { "BTCUSDT" };
+            }
+
+            _isRunning = true;
+            _webSocket = new ClientWebSocket();
+            _cancellationTokenSource = new CancellationTokenSource();
+            _subscribedSymbols = new List<string>(symbols);
+            shouldConnect = true;
         }
 
-        _isRunning = true;
-        _webSocket = new ClientWebSocket();
-        _cancellationTokenSource = new CancellationTokenSource();
-        _subscribedSymbols = new List<string>(symbols);
-
-        try
+        if (shouldConnect)
         {
-            await _webSocket.ConnectAsync(new Uri(BYBIT_WS_URL), _cancellationTokenSource.Token);
-
-            // Create topic strings for each symbol
-            var topics = symbols.Select(s => $"tickers.{s}").ToArray();
-
-            // Subscribe to all requested tickers
-            var subscribeMessage = new
-            {
-                op = "subscribe",
-                args = topics
-            };
-
-            var subscribeJson = JsonSerializer.Serialize(subscribeMessage);
-            var subscribeBytes = Encoding.UTF8.GetBytes(subscribeJson);
-
-            await _webSocketSemaphore.WaitAsync();
             try
             {
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(subscribeBytes),
-                    WebSocketMessageType.Text,
-                    true,
-                    _cancellationTokenSource.Token);
+                await _webSocket.ConnectAsync(new Uri(BYBIT_WS_URL), _cancellationTokenSource.Token);
 
-                Console.WriteLine($"Sent subscription request for {string.Join(", ", topics)}");
+                // Create topic strings for each symbol
+                var topics = symbols.Select(s => $"tickers.{s}").ToArray();
+
+                // Subscribe to all requested tickers
+                var subscribeMessage = new
+                {
+                    op = "subscribe",
+                    args = topics
+                };
+
+                var subscribeJson = JsonSerializer.Serialize(subscribeMessage);
+                var subscribeBytes = Encoding.UTF8.GetBytes(subscribeJson);
+
+                await _webSocketSemaphore.WaitAsync();
+                try
+                {
+                    await _webSocket.SendAsync(
+                        new ArraySegment<byte>(subscribeBytes),
+                        WebSocketMessageType.Text,
+                        true,
+                        _cancellationTokenSource.Token);
+
+                    Console.WriteLine($"Sent subscription request for {string.Join(", ", topics)}");
+                }
+                finally
+                {
+                    _webSocketSemaphore.Release();
+                }
+
+                // Start receiving messages
+                _ = ReceiveMessagesAsync();
             }
-            finally
+            catch (Exception ex)
             {
-                _webSocketSemaphore.Release();
+                Console.WriteLine($"WebSocket connection error: {ex.Message}");
+                lock (_stateLock)
+                {
+                    _isRunning = false;
+                }
             }
-
-            // Start receiving messages
-            _ = ReceiveMessagesAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"WebSocket connection error: {ex.Message}");
-            _isRunning = false;
         }
     }
 
     public async Task StopAsync()
     {
-        if (!_isRunning)
-            return;
-
-        _cancellationTokenSource.Cancel();
-
-        if (_webSocket.State == WebSocketState.Open)
+        ClientWebSocket socketToClose = null;
+        CancellationTokenSource tokenSourceToCancel = null;
+        
+        lock (_stateLock)
         {
-            await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+            if (!_isRunning)
+                return;
+                
+            socketToClose = _webSocket;
+            tokenSourceToCancel = _cancellationTokenSource;
+            _isRunning = false;
         }
 
-        _webSocket.Dispose();
-        _isRunning = false;
+        tokenSourceToCancel?.Cancel();
+
+        if (socketToClose != null && socketToClose.State == WebSocketState.Open)
+        {
+            try
+            {
+                await socketToClose.CloseAsync(
+                    WebSocketCloseStatus.NormalClosure, 
+                    "Closing", 
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error closing WebSocket: {ex.Message}");
+            }
+            
+            socketToClose.Dispose();
+        }
     }
 
     private async Task ReceiveMessagesAsync()
@@ -117,15 +149,24 @@ public class BybitWebSocketService
 
         try
         {
-            while (_webSocket.State == WebSocketState.Open && !_cancellationTokenSource.Token.IsCancellationRequested)
+            ClientWebSocket socket;
+            CancellationToken token;
+            
+            lock (_stateLock)
+            {
+                socket = _webSocket;
+                token = _cancellationTokenSource.Token;
+            }
+            
+            while (socket.State == WebSocketState.Open && !token.IsCancellationRequested)
             {
                 WebSocketReceiveResult result;
                 var message = new StringBuilder();
 
                 do
                 {
-                    result = await _webSocket.ReceiveAsync(
-                        new ArraySegment<byte>(buffer), _cancellationTokenSource.Token);
+                    result = await socket.ReceiveAsync(
+                        new ArraySegment<byte>(buffer), token);
 
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
@@ -133,7 +174,7 @@ public class BybitWebSocketService
                     }
                     else if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        await _webSocket.CloseAsync(
+                        await socket.CloseAsync(
                             WebSocketCloseStatus.NormalClosure,
                             "Connection closed by the server",
                             CancellationToken.None);
@@ -164,7 +205,10 @@ public class BybitWebSocketService
         }
         finally
         {
-            _isRunning = false;
+            lock (_stateLock)
+            {
+                _isRunning = false;
+            }
         }
     }
 
@@ -192,9 +236,16 @@ public class BybitWebSocketService
                     {
                         // Extract symbol from topic (format: "tickers.SYMBOL")
                         string symbol = topicValue.Substring("tickers.".Length);
+                        bool isSubscribed = false;
+                        
+                        // Thread-safe check for subscription
+                        lock (_stateLock)
+                        {
+                            isSubscribed = _subscribedSymbols.Contains(symbol);
+                        }
 
                         // Process only if we're subscribed to this symbol
-                        if (_subscribedSymbols.Contains(symbol))
+                        if (isSubscribed)
                         {
                             // Try to get price data - first attempt with indexPrice
                             if (dataElement.TryGetProperty("indexPrice", out var indexPriceElement))

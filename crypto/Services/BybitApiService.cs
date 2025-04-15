@@ -14,6 +14,7 @@ public class BybitApiService
     private readonly HttpClient _httpClient;
     private readonly CryptoThreadPoolService _threadPool;
     private const string baseUrl = "https://api.bybit.nl/v5/market/index-price-kline";
+    private readonly object _httpClientLock = new object(); // Lock object for HttpClient operations
 
     public BybitApiService(CryptoThreadPoolService threadPool = null)
     {
@@ -42,7 +43,19 @@ public class BybitApiService
 
         try
         {
-            return await _httpClient.GetFromJsonAsync<KlineResponse>(url);
+            // Use lock for thread-safe access to HttpClient
+            // Note: We're using a hybrid approach here - lock for synchronization but 
+            // still allowing the HTTP request itself to run asynchronously
+            Task<KlineResponse> requestTask;
+            
+            lock (_httpClientLock)
+            {
+                // Initialize the task while holding the lock
+                requestTask = _httpClient.GetFromJsonAsync<KlineResponse>(url);
+            }
+            
+            // Wait for the task to complete outside the lock
+            return await requestTask;
         }
         catch (Exception ex)
         {

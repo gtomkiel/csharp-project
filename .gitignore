@@ -21,3 +21,4 @@ obj/
 *.csproj.nuget.g.*
 project.packagespec.json
 *.project.**
+.vs

@@ -15,6 +15,7 @@ namespace crypto.Services
         private readonly SemaphoreSlim _semaphore;
         private readonly ConcurrentDictionary<string, Task> _runningTasks;
         private readonly CancellationTokenSource _globalCancellationTokenSource;
+        private readonly object _operationsLock = new object(); // Lock object for thread-safe operations
 
         /// <summary>
         /// Initializes a new instance of the CryptoThreadPoolService with a specified maximum number of concurrent tasks.
@@ -135,8 +136,14 @@ namespace crypto.Services
         /// </summary>
         public void CancelAllTasks()
         {
-            _globalCancellationTokenSource.Cancel();
-            Console.WriteLine("All tasks have been requested to cancel");
+            lock (_operationsLock)
+            {
+                if (!_globalCancellationTokenSource.IsCancellationRequested)
+                {
+                    _globalCancellationTokenSource.Cancel();
+                    Console.WriteLine("All tasks have been requested to cancel");
+                }
+            }
         }
 
         /// <summary>
@@ -145,7 +152,12 @@ namespace crypto.Services
         /// <returns>Task representing the completion of all tasks</returns>
         public async Task WaitForAllTasksAsync()
         {
-            var tasks = _runningTasks.Values.ToArray();
+            Task[] tasks;
+            lock (_operationsLock)
+            {
+                tasks = _runningTasks.Values.ToArray();
+            }
+            
             if (tasks.Length > 0)
             {
                 await Task.WhenAll(tasks);
@@ -158,7 +170,10 @@ namespace crypto.Services
         /// <returns>Number of running tasks</returns>
         public int GetRunningTaskCount()
         {
-            return _runningTasks.Count;
+            lock (_operationsLock)
+            {
+                return _runningTasks.Count;
+            }
         }
 
         /// <summary>
@@ -166,9 +181,12 @@ namespace crypto.Services
         /// </summary>
         public void Dispose()
         {
-            CancelAllTasks();
-            _semaphore.Dispose();
-            _globalCancellationTokenSource.Dispose();
+            lock (_operationsLock)
+            {
+                CancelAllTasks();
+                _semaphore.Dispose();
+                _globalCancellationTokenSource.Dispose();
+            }
         }
     }
 }
