@@ -79,6 +79,45 @@ public class BybitApiService
     }
 
     /// <summary>
+    /// Generic method for batch processing using thread pool
+    /// </summary>
+    /// <typeparam name="TKey">Type of the dictionary key</typeparam>
+    /// <param name="items">Collection of items to process</param>
+    /// <param name="keyPrefix">Prefix for task keys</param>
+    /// <param name="workItemFactory">Factory function to create work items</param>
+    /// <returns>Dictionary mapping keys to their respective data responses</returns>
+    private async Task<Dictionary<TKey, KlineResponse>> ProcessBatchAsync<TKey>(
+        IEnumerable<TKey> items,
+        string keyPrefix,
+        Func<TKey, CancellationToken, Task<KlineResponse>> workItemFactory)
+    {
+        var results = new Dictionary<TKey, KlineResponse>();
+        var tasks = new List<Task>();
+
+        foreach (var item in items)
+        {
+            var task = _threadPool.EnqueueTaskWithResultAsync<KlineResponse>(
+                $"{keyPrefix}_{item}",
+                async (cancellationToken) => await workItemFactory(item, cancellationToken)
+            ).ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully && t.Result != null)
+                {
+                    lock (results)
+                    {
+                        results[item] = t.Result;
+                    }
+                }
+            });
+
+            tasks.Add(task);
+        }
+
+        await Task.WhenAll(tasks);
+        return results;
+    }
+
+    /// <summary>
     /// Fetches data for multiple tokens in parallel using the thread pool
     /// </summary>
     /// <param name="symbols">List of token symbols to fetch</param>
@@ -92,34 +131,11 @@ public class BybitApiService
         long startTime,
         long endTime)
     {
-        var results = new Dictionary<string, KlineResponse>();
-        var tasks = new List<Task>();
-
-        foreach (var symbol in symbols)
-        {
-            var task = _threadPool.EnqueueTaskWithResultAsync<KlineResponse>(
-                $"fetch_{symbol}_{interval}",
-                async (cancellationToken) =>
-                {
-                    return await GetTokenDataAsync(symbol, interval, startTime, endTime);
-                }
-            ).ContinueWith(t =>
-            {
-                if (t.IsCompletedSuccessfully && t.Result != null)
-                {
-                    lock (results)
-                    {
-                        results[symbol] = t.Result;
-                    }
-                }
-            });
-
-            tasks.Add(task);
-        }
-
-        // Wait for all tasks to complete
-        await Task.WhenAll(tasks);
-        return results;
+        return await ProcessBatchAsync(
+            symbols,
+            $"fetch_{{0}}_{interval}",
+            async (symbol, cancellationToken) => await GetTokenDataAsync(symbol, interval, startTime, endTime)
+        );
     }
 
     /// <summary>
@@ -136,37 +152,18 @@ public class BybitApiService
         long startTime,
         long endTime)
     {
-        var results = new Dictionary<object, KlineResponse>();
-        var tasks = new List<Task>();
-
-        foreach (var interval in intervalList)
-        {
-            var task = _threadPool.EnqueueTaskWithResultAsync<KlineResponse>(
-                $"process_{symbol}_{interval}",
-                async (cancellationToken) =>
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        return null;
-                    }
-                    return await GetTokenDataAsync(symbol, interval, startTime, endTime);
-                }
-            ).ContinueWith(t =>
+        return await ProcessBatchAsync(
+            intervalList,
+            $"process_{symbol}_{{0}}",
+            async (interval, cancellationToken) =>
             {
-                if (t.IsCompletedSuccessfully && t.Result != null)
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    lock (results)
-                    {
-                        results[interval] = t.Result;
-                    }
+                    return null;
                 }
-            });
-
-            tasks.Add(task);
-        }
-
-        await Task.WhenAll(tasks);
-        return results;
+                return await GetTokenDataAsync(symbol, interval, startTime, endTime);
+            }
+        );
     }
 
     /// <summary>
