@@ -21,6 +21,48 @@ public partial class HistoryPage : ContentPage
         LastYear
     }
 
+    // Configuration class for timeframe settings
+    private class TimeframeConfig
+    {
+        public object Interval { get; set; }
+        public Func<DateTimeOffset, DateTimeOffset> GetStartTime { get; set; }
+        public string DateFormat { get; set; }
+        public TimeSpan UnitWidth { get; set; }
+    }
+
+    // Static dictionary to store timeframe configurations
+    private static readonly Dictionary<TimeframeOption, TimeframeConfig> TimeframeConfigs = new()
+    {
+        [TimeframeOption.LastDay] = new TimeframeConfig
+        {
+            Interval = 60,
+            GetStartTime = now => now.AddDays(-1),
+            DateFormat = "HH:mm",
+            UnitWidth = TimeSpan.FromMinutes(60)
+        },
+        [TimeframeOption.LastWeek] = new TimeframeConfig
+        {
+            Interval = 360,
+            GetStartTime = now => now.AddDays(-7),
+            DateFormat = "dd/MM HH:mm",
+            UnitWidth = TimeSpan.FromMinutes(360)
+        },
+        [TimeframeOption.LastMonth] = new TimeframeConfig
+        {
+            Interval = "D",
+            GetStartTime = now => now.AddMonths(-1),
+            DateFormat = "dd/MM",
+            UnitWidth = TimeSpan.FromDays(1)
+        },
+        [TimeframeOption.LastYear] = new TimeframeConfig
+        {
+            Interval = "M",
+            GetStartTime = now => now.AddYears(-1),
+            DateFormat = "yyyy/MM",
+            UnitWidth = TimeSpan.FromDays(30)
+        }
+    };
+
     private string _crypto = string.Empty;
     private readonly BybitApiService _apiService;
     private TimeframeOption _selectedTimeframe = TimeframeOption.LastDay; // Default to last day
@@ -103,35 +145,12 @@ public partial class HistoryPage : ContentPage
         {
             var now = DateTimeOffset.UtcNow;
             var nowMillis = now.ToUnixTimeMilliseconds();
-            long startTimeMillis;
-            object interval;
 
-            // Set interval and start time based on selected timeframe
-            switch (_selectedTimeframe)
-            {
-                case TimeframeOption.LastDay:
-                    interval = 60; // 60 minutes
-                    startTimeMillis = now.AddDays(-1).ToUnixTimeMilliseconds();
-                    break;
-                case TimeframeOption.LastWeek:
-                    interval = 360; // 6 hours (360 minutes)
-                    startTimeMillis = now.AddDays(-7).ToUnixTimeMilliseconds();
-                    break;
-                case TimeframeOption.LastMonth:
-                    interval = "D"; // Daily
-                    startTimeMillis = now.AddMonths(-1).ToUnixTimeMilliseconds();
-                    break;
-                case TimeframeOption.LastYear:
-                    interval = "M"; // Monthly
-                    startTimeMillis = now.AddYears(-1).ToUnixTimeMilliseconds();
-                    break;
-                default:
-                    interval = 60;
-                    startTimeMillis = now.AddDays(-1).ToUnixTimeMilliseconds();
-                    break;
-            }
+            // Get configuration for selected timeframe
+            var config = TimeframeConfigs[_selectedTimeframe];
+            var startTimeMillis = config.GetStartTime(now).ToUnixTimeMilliseconds();
 
-            var response = await _apiService.GetTokenDataAsync(symbol, interval, startTimeMillis, nowMillis);
+            var response = await _apiService.GetTokenDataAsync(symbol, config.Interval, startTimeMillis, nowMillis);
 
             if (response != null && response.RetCode == 0 && response.Result?.List?.Count > 0)
             {
@@ -178,33 +197,8 @@ public partial class HistoryPage : ContentPage
 
     private void UpdateXAxes(TimeframeOption timeframeOption)
     {
-        string dateFormat;
-        TimeSpan unitWidth;
-
-        // Set appropriate date format and unit width based on timeframe
-        switch (timeframeOption)
-        {
-            case TimeframeOption.LastDay:
-                dateFormat = "HH:mm";
-                unitWidth = TimeSpan.FromMinutes(60);
-                break;
-            case TimeframeOption.LastWeek:
-                dateFormat = "dd/MM HH:mm";
-                unitWidth = TimeSpan.FromMinutes(360);
-                break;
-            case TimeframeOption.LastMonth:
-                dateFormat = "dd/MM";
-                unitWidth = TimeSpan.FromDays(1);
-                break;
-            case TimeframeOption.LastYear:
-                dateFormat = "yyyy/MM";
-                unitWidth = TimeSpan.FromDays(30);
-                break;
-            default:
-                dateFormat = "dd/MM HH:mm";
-                unitWidth = TimeSpan.FromMinutes(60);
-                break;
-        }
+        // Get configuration for the timeframe
+        var config = TimeframeConfigs[timeframeOption];
 
         XAxes = new[]
         {
@@ -212,8 +206,8 @@ public partial class HistoryPage : ContentPage
             {
                 LabelsPaint = new SolidColorPaint(SKColors.White),
                 LabelsRotation = 45,
-                Labeler = value => new DateTime((long)value).ToString(dateFormat),
-                UnitWidth = unitWidth.Ticks
+                Labeler = value => new DateTime((long)value).ToString(config.DateFormat),
+                UnitWidth = config.UnitWidth.Ticks
             }
         };
 
